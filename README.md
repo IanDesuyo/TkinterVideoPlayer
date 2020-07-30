@@ -1,6 +1,3 @@
 # TkinterVideoPlayer
 
-基於Tkinter與VLC所做成的影片撥放器
-
-### Requirements
-* [VLC](https://www.videolan.org/vlc)
+基於Tkinter, 使用OpenCV處理影像的影片撥放器

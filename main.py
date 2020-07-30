@@ -1,152 +1,148 @@
-import platform
+from PIL import Image, ImageTk
 import tkinter as tk
 import tkinter.filedialog
-from PIL import ImageTk, Image
-import vlc
+import tkinter.messagebox
+from datetime import datetime
+import cv2
 import os
-
+import numpy
 
 script_dir = os.path.dirname(__file__)
 
 
-class VideoPlayer:
-    def __init__(self, path=None):
-        self.media = vlc.MediaPlayer()
-        self.media.audio_set_mute(True)
-        self.media.video_set_mouse_input(False)
-
-    def openFile(self, uri):
-        self.media.set_mrl(uri)
-
-    def play(self, path=None):
-        if path:
-            self.openFile(path)
-        self.media.play()
-
-    def pause(self):
-        self.media.pause()
-
-    def getState(self):
-        state = self.media.get_state()
-        if state == vlc.State.Playing:
-            return 1
-        elif state == vlc.State.Paused:
-            return 0
-        return -1
-
-    def getPosition(self):
-        return self.media.get_position()
-
-    def setPosition(self, val):
-        self.media.set_position(val)
-
-    def getRate(self):
-        return self.media.get_rate()
-
-    def setRate(self, rate):
-        self.media.set_rate(rate)
-
-    def setWindow(self, wm_id):
-        if platform.system() == "Windows":
-            self.media.set_hwnd(wm_id)
-        else:
-            self.media.set_xwindow(wm_id)
-
-    def screenshot(self, path):
-        return self.media.video_take_snapshot(
-            num=0, psz_filepath=path, i_height=self.media.video_get_height(), i_width=self.media.video_get_width()
-        )
-
-    def getLength(self):
-        return self.media.get_length()
-
-    def getTime(self):
-        return self.media.get_time() / 1000
-
-    def add_callback(self, event_type, callback):
-        self.media.event_manager().event_attach(event_type, callback)
-
-    def remove_callback(self, event_type, callback):
-        self.media.event_manager().event_detach(event_type, callback)
-
-
-class App(tk.Tk):
-    def __init__(self):
-        super().__init__()
-        self.player = VideoPlayer()
-        self.title("Video Player")
-        # Video Canvas
-        self._videoCanvas = tk.Canvas(self, bg="black")
-        self._videoCanvas.pack(fill="both", expand=True)
-        self.player.setWindow(self._videoCanvas.winfo_id())
+class App:
+    def __init__(self, window=None):
+        self.window = window
+        self.cap = None
+        self.current_image = None
+        # Status
+        self.playing = False
+        self.isVideo = False
+        self.totalFrame = 0
+        self.frameCount = 0
+        self.fps = 1
+        self.frameInterval = 10
+        self.rate = 1
+        # Video Panel
+        self.videoPanel = tk.Label(self.window, text="\/ Check Here to start!                ")
+        self.videoPanel.pack(fill="both", expand=True, padx=10, pady=10)
         # Control Panel
-        self.frame = tk.Frame(self)
-        self.seekBar = tk.Scale(self.frame, from_=0, to=1000, orient=tk.HORIZONTAL, length=600, showvalue=False,)
-        self.seekBar.pack(side=tk.TOP, padx=10)
-        self.speedLabel = tk.Label(self.frame, text="Speed: x1.0")
-        self.speedLabel.pack(side=tk.LEFT, padx=10)
-        tk.Button(self.frame, text="▶", command=lambda: self.control(0)).pack(side=tk.LEFT, padx=5)
-        tk.Button(self.frame, text="Open", command=lambda: self.control(2)).pack(side=tk.LEFT, padx=5)
-        tk.Button(self.frame, text="⏪", command=lambda: self.setRate(0)).pack(side=tk.LEFT, padx=5)
-        tk.Button(self.frame, text="⏩", command=lambda: self.setRate(1)).pack(side=tk.LEFT, padx=5)
-        tk.Button(self.frame, text="screenshot", command=lambda: self.screenshot()).pack(side=tk.LEFT, padx=5)
-        self.timerLabel = tk.Label(self.frame, text="")
-        self.timerLabel.pack(side=tk.LEFT, padx=10)
-        self.frame.pack()
-        self.timer()
+        self.controlPanel = tk.Frame(self.window)
+        tk.Button(self.controlPanel, text="Use Camera", command=lambda: self.useCamera()).pack(
+            side=tk.LEFT, padx=(100, 0)
+        )
+        tk.Button(self.controlPanel, text="Open File", command=lambda: self.handleOpen()).pack(side=tk.LEFT)
+        tk.Button(self.controlPanel, text="Take a Picture", command=lambda: self.screenShot()).pack(side=tk.LEFT)
+        tk.Button(self.controlPanel, text="Play / Pause", command=lambda: self.playPause()).pack(side=tk.LEFT)
+        tk.Button(self.controlPanel, text="<<", command=lambda: self.setRate(+0.2)).pack(side=tk.LEFT)
+        tk.Button(self.controlPanel, text=">>", command=lambda: self.setRate(-0.2)).pack(side=tk.LEFT)
+        self.frameLabel = tk.Label(self.controlPanel, text="", width=20)
+        self.frameLabel.pack(side=tk.LEFT)
+        self.controlPanel.pack()
+        self.frameLoop()
 
-    def setTime(self, val):
-        val = val / 1000
-        self.player.setPosition(val)
+    def useCamera(self):
+        self.cap = cv2.VideoCapture(0)
+        self.frameCount = 0
+        self.totalFrame = -1
+        self.isVideo = False
+        self.frameInterval = 10
+        self.rate = 1
+        self.frameLabel.configure(text="")
+        self.playing = True
+        print("\n==========Camera=========")
+        print("Camera ID: 0")
+        print("Frames Wait Time:", self.frameInterval)
+        print("=========================\n")
 
-    def timer(self):
-        time = round(self.player.getTime(), None)
-        min = int(time / 60)
-        sec = time - min * 60
-
-        if time < 0:
-            self.seekBar.set(0)
-            self.timerLabel.configure(text="")
-        else:
-            self.seekBar.set(self.player.getPosition() * 1000)
-            self.timerLabel.configure(text=f"Time: {round(min, None)}: {round(sec, None)}")
-        self.after(100, self.timer)
-
-    def control(self, action):
-        if action == 0:
-            if self.player.getState() == 1:
-                return self.player.pause()
-            self.player.play()
-        elif action == 2:
-            path = tk.filedialog.askopenfilename()
-            if path:
-                self.player.play(path)
-                self.setRate(val=1.0)
-
-    def setRate(self, action=None, val=None):
-        if val:
-            self.speedLabel.configure(text=f"Speed: x{val}")
-            return self.player.setRate(val)
-        rate = self.player.getRate()
-        if action == 0:
-            if rate <= 0.2:
-                return
-            nextRate = round(rate - 0.2, 1)
-        else:
-            if rate >= 8:
-                return
-            nextRate = round(rate + 0.2, 1)
-        self.speedLabel.configure(text=f"Speed: x{nextRate}")
-        self.player.setRate(nextRate)
-
-    def screenshot(self):
-        if self.player.getState() == 1:
-            self.player.pause()
-        path = tk.filedialog.asksaveasfilename(initialdir=script_dir, filetypes=[("PNG", ".png"), ("JPEG", ".jpg")])
+    def handleOpen(self):
+        path = tk.filedialog.askopenfilename()
         if path:
-            self.player.screenshot(path)
+            if path.split(".")[-1].lower() in ["mkv", "mp4", "avi", "mov", "mpeg", "flv", "wmv"]:
+                self.openFile(path)
+            else:
+                tk.messagebox.showinfo("無法開啟檔案","此檔案不是支援的影片檔")
+
+    def openFile(self, path):
+        self.cap = cv2.VideoCapture(path)
+        self.frameCount = 0
+        self.getDetails()
+        self.isVideo = True
+        self.playing = True
+        print("\n==========Video==========")
+        print("File:", path)
+        print("File Type:", path.split(".")[-1])
+        print("FPS:", self.fps)
+        print("Total Frames:", self.totalFrame)
+        print(f"Frame Interval: {self.frameInterval}ms")
+        print("=========================\n")
+
+    def getDetails(self):
+        self.totalFrame = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+        self.frameInterval = int(500 / self.fps)
+        self.rate = 1
+
+    def playPause(self):
+        if not self.cap:
+            return
+        if self.playing:
+            self.playing = False
+            return
+        self.playing = True
+
+    def setRate(self, val):
+        if not self.isVideo or not self.playing:
+            return
+        if self.rate <= 0.3 and val == -0.2:
+            return
+        if self.rate >= 4 and val == +0.2:
+            return
+        self.rate += val
+        print("\n=======Rate Change=======")
+        print(f"Current Rate: {self.rate} (0.2~4.0)")
+        print(f"Frame Interval: {int(self.frameInterval * self.rate)}ms")
+        print("=========================\n")
+
+    def frameLoop(self):
+        if self.playing:
+            self.cap.grab()
+            self.frameCount += 1
+            # skip 1 frame for better performance
+            if self.frameCount % 2 == 0:
+                if self.isVideo:
+                    self.frameLabel.configure(
+                        text=f"{self.frameCount}/{self.totalFrame} - {round((self.frameCount / self.totalFrame)*100, 2)}%"
+                    )
+                ok, self.current_image = self.cap.retrieve()
+                if ok:
+                    resizedFrame = cv2.resize(self.current_image, (1280, 720))
+                    cv2image = cv2.cvtColor(resizedFrame, cv2.COLOR_BGR2RGBA)
+                    image = Image.fromarray(cv2image)
+                    imgtk = ImageTk.PhotoImage(image=image)
+                    self.videoPanel.imgtk = imgtk
+                    self.videoPanel.configure(image=imgtk)
+        self.window.after(int(self.frameInterval * self.rate), self.frameLoop)
+
+    def screenShot(self):
+        if not self.cap or not isinstance(self.current_image, numpy.ndarray):
+            return
+        self.playing = False
+        cv2image = cv2.cvtColor(self.current_image, cv2.COLOR_BGR2RGBA)
+        image = Image.fromarray(cv2image)
+        path = tk.filedialog.asksaveasfilename(
+            initialdir=script_dir, filetypes=[("PNG", ".png"), ("JPEG", ".jpg")], defaultextension=".png"
+        )
+        if not path:
+            path = os.path.join(script_dir, f"screenshot_{datetime.now().strftime('%Y%m%d-%H%M%S')}.png")
+        image.save(path)
+        print("\n========ScreenShot=======")
+        print("Saved at", path)
+        print("File Type:", path.split(".")[-1])
+        print("=========================\n")
 
 
-if "__main__" == __name__:
-    app = App()
-    app.mainloop()
+root = tk.Tk()
+root.title("Video Player")
+app = App(root)
+app.window.mainloop()
