@@ -10,12 +10,15 @@ import numpy
 script_dir = os.path.dirname(__file__)
 
 
-class App:
-    def __init__(self, window=None):
+class VideoPlayer(tk.Frame):
+    def __init__(self, window=None, cameraNum=0, videoSize=(1280, 720)):
+        super().__init__()
         self.window = window
         self.cap = None
         self.current_image = None
         # Status
+        self.cameraNum = cameraNum
+        self.videoSize = videoSize
         self.playing = False
         self.isVideo = False
         self.totalFrame = 0
@@ -25,10 +28,10 @@ class App:
         self.rate = 1
         # Video Panel
         self.videoPanel = tk.Label(self.window, text="\/ Check Here to start!                ")
-        self.videoPanel.pack(fill="both", expand=True, padx=10, pady=10)
+        self.videoPanel.pack(fill="both", expand=True, padx=5, pady=5)
         # Control Panel
         self.controlPanel = tk.Frame(self.window)
-        tk.Button(self.controlPanel, text="Use Camera", command=lambda: self.useCamera()).pack(
+        tk.Button(self.controlPanel, text=f"Use Camera(ID:{self.cameraNum})", command=lambda: self.useCamera()).pack(
             side=tk.LEFT, padx=(100, 0)
         )
         tk.Button(self.controlPanel, text="Open File", command=lambda: self.handleOpen()).pack(side=tk.LEFT)
@@ -42,7 +45,7 @@ class App:
         self.frameLoop()
 
     def useCamera(self):
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(self.cameraNum)
         self.frameCount = 0
         self.totalFrame = -1
         self.isVideo = False
@@ -51,7 +54,7 @@ class App:
         self.frameLabel.configure(text="")
         self.playing = True
         print("\n==========Camera=========")
-        print("Camera ID: 0")
+        print("Camera ID:", self.cameraNum)
         print("Frames Wait Time:", self.frameInterval)
         print("=========================\n")
 
@@ -61,7 +64,7 @@ class App:
             if path.split(".")[-1].lower() in ["mkv", "mp4", "avi", "mov", "mpeg", "flv", "wmv"]:
                 self.openFile(path)
             else:
-                tk.messagebox.showinfo("無法開啟檔案","此檔案不是支援的影片檔")
+                tk.messagebox.showinfo("無法開啟檔案", "此檔案不是支援的影片檔")
 
     def openFile(self, path):
         self.cap = cv2.VideoCapture(path)
@@ -116,7 +119,7 @@ class App:
                     )
                 ok, self.current_image = self.cap.retrieve()
                 if ok:
-                    resizedFrame = cv2.resize(self.current_image, (1280, 720))
+                    resizedFrame = cv2.resize(self.current_image, (self.videoSize))
                     cv2image = cv2.cvtColor(resizedFrame, cv2.COLOR_BGR2RGBA)
                     image = Image.fromarray(cv2image)
                     imgtk = ImageTk.PhotoImage(image=image)
@@ -142,7 +145,17 @@ class App:
         print("=========================\n")
 
 
-root = tk.Tk()
-root.title("Video Player")
-app = App(root)
-app.window.mainloop()
+class App(tk.Tk):
+    def __init__(self, totalFrame=1, frameSize=(854, 480)):
+        super().__init__()
+        self.title("Video Player")
+        if totalFrame < 1:
+            tk.messagebox.showwarning("設定錯誤", "視窗數不能小於1")
+            exit()
+        for i in range(totalFrame):
+            VideoPlayer(self, cameraNum=i, videoSize=frameSize)
+
+
+if __name__ == "__main__":
+    app = App(2)
+    app.mainloop()
