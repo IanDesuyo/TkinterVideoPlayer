@@ -21,7 +21,7 @@ class VideoPlayer(tk.Frame):
         self.currentImage = None
         # Status
         self.cameraNum = cameraNum
-        self.videoSize = videoSize
+        self.videoSize = (videoSize[0], videoSize[1] - 50)
         self.isPlaying = False
         self.isVideo = False
         self.totalFrame = 0
@@ -32,7 +32,7 @@ class VideoPlayer(tk.Frame):
         self.nowTimeString = ""
         self.totalTimeString = ""
 
-        self.display = tk.Canvas(self, bd=0, highlightthickness=0)
+        self.display = tk.Canvas(self, bd=0, highlightthickness=0, bg="black")
         self.display.grid(row=0, sticky=tk.W + tk.E + tk.N + tk.S)
         self.pack(fill=tk.BOTH, expand=1)
 
@@ -40,7 +40,9 @@ class VideoPlayer(tk.Frame):
         self.startupResized = self.startupBG.resize(self.videoSize, Image.ANTIALIAS)
         self.startupResized = ImageTk.PhotoImage(self.startupResized)
         self.display.delete("VID")
-        self.display.create_image(0, 0, image=self.startupResized, anchor=tk.NW, tags="VID")
+        self.display.create_image(
+            0, 0, image=self.startupResized, anchor=tk.NW, tags="VID"
+        )
 
         self.loadUI()
         self.drawUI()
@@ -51,12 +53,14 @@ class VideoPlayer(tk.Frame):
         self.frameLoop()
 
     def resize(self, event):
-        self.videoSize = (event.width, event.height)
+        self.videoSize = (event.width, event.height - 50)
         if not self.isPlaying:
             self.startupResized = self.startupBG.resize(self.videoSize, Image.ANTIALIAS)
             self.startupResized = ImageTk.PhotoImage(self.startupResized)
             self.display.delete("VID")
-            self.display.create_image(0, 0, image=self.startupResized, anchor=tk.NW, tags="VID")
+            self.display.create_image(
+                0, 0, image=self.startupResized, anchor=tk.NW, tags="VID"
+            )
         self.drawUI()
 
     def useCamera(self):
@@ -75,7 +79,15 @@ class VideoPlayer(tk.Frame):
     def handleOpen(self):
         path = tk.filedialog.askopenfilename()
         if path:
-            if path.split(".")[-1].lower() in ["mkv", "mp4", "avi", "mov", "mpeg", "flv", "wmv"]:
+            if path.split(".")[-1].lower() in [
+                "mkv",
+                "mp4",
+                "avi",
+                "mov",
+                "mpeg",
+                "flv",
+                "wmv",
+            ]:
                 self.openFile(path)
             else:
                 tk.messagebox.showinfo("無法開啟檔案", "此檔案不是支援的影片檔")
@@ -153,7 +165,9 @@ class VideoPlayer(tk.Frame):
                     image = Image.fromarray(cv2image)
                     self.imgtk = ImageTk.PhotoImage(image)
                     self.display.delete("VID")
-                    self.display.create_image(0, 0, image=self.imgtk, anchor=tk.NW, tags="VID")
+                    self.display.create_image(
+                        0, 0, image=self.imgtk, anchor=tk.NW, tags="VID"
+                    )
                     self.drawUI()
         self.after(int(self.frameInterval * self.rate), self.frameLoop)
 
@@ -165,10 +179,14 @@ class VideoPlayer(tk.Frame):
         cv2image = cv2.cvtColor(self.currentImage, cv2.COLOR_BGR2RGBA)
         image = Image.fromarray(cv2image)
         path = tk.filedialog.asksaveasfilename(
-            initialdir=script_dir, filetypes=[("PNG", ".png"), ("JPEG", ".jpg")], defaultextension=".png"
+            initialdir=script_dir,
+            filetypes=[("PNG", ".png"), ("JPEG", ".jpg")],
+            defaultextension=".png",
         )
         if not path:
-            path = os.path.join(script_dir, f"screenshot_{datetime.now().strftime('%Y%m%d-%H%M%S')}.png")
+            path = os.path.join(
+                script_dir, f"screenshot_{datetime.now().strftime('%Y%m%d-%H%M%S')}.png"
+            )
         image.save(path)
         print("\n========ScreenShot=======")
         print("Saved at", path)
@@ -179,36 +197,49 @@ class VideoPlayer(tk.Frame):
         print("pressed", event.keycode)
 
     def click(self, event):
-        if event.y in range(self.videoSize[1] - 80, self.videoSize[1] - 50):
-            if event.x in range(int(self.videoSize[0] / 2 - 12), int(self.videoSize[0] / 2 + 12)):
+        if event.y in range(self.videoSize[1]+20, self.videoSize[1] + 50):
+            if event.x in range(
+                int(self.videoSize[0] / 2 - 12), int(self.videoSize[0] / 2 + 12)
+            ):
                 print("Play")
                 self.isPlaying = not self.isPlaying
                 self.drawUI()
-            elif event.x in range(int(self.videoSize[0] / 2 - 62), int(self.videoSize[0] / 2 - 38)):
+            elif event.x in range(
+                int(self.videoSize[0] / 2 - 62), int(self.videoSize[0] / 2 - 38)
+            ):
                 print("backfard")
                 self.setRate(+0.2)
-            elif event.x in range(int(self.videoSize[0] / 2 - 112), int(self.videoSize[0] / 2 - 88)):
+            elif event.x in range(
+                int(self.videoSize[0] / 2 - 112), int(self.videoSize[0] / 2 - 88)
+            ):
                 print("import")
                 self.handleOpen()
-            elif event.x in range(int(self.videoSize[0] / 2 - 162), int(self.videoSize[0] / 2 - 138)):
+            elif event.x in range(
+                int(self.videoSize[0] / 2 - 162), int(self.videoSize[0] / 2 - 138)
+            ):
                 print("camera")
                 self.useCamera()
-            elif event.x in range(int(self.videoSize[0] / 2 + 38), int(self.videoSize[0] / 2 + 62)):
+            elif event.x in range(
+                int(self.videoSize[0] / 2 + 38), int(self.videoSize[0] / 2 + 62)
+            ):
                 print("forward")
                 self.setRate(-0.2)
-            elif event.x in range(int(self.videoSize[0] / 2 + 88), int(self.videoSize[0] / 2 + 112)):
+            elif event.x in range(
+                int(self.videoSize[0] / 2 + 88), int(self.videoSize[0] / 2 + 112)
+            ):
                 print("go back")
                 self.jumpTo(0)
-            elif event.x in range(int(self.videoSize[0] / 2 + 138), int(self.videoSize[0] / 2 + 162)):
+            elif event.x in range(
+                int(self.videoSize[0] / 2 + 138), int(self.videoSize[0] / 2 + 162)
+            ):
                 print("export")
                 self.screenShot()
         if self.cap or isinstance(self.currentImage, numpy.ndarray):
-            if event.y in range(self.videoSize[1] - 30, self.videoSize[1] - 10):
-                if event.x in range(int(self.videoSize[0] / 2 - 180), int(self.videoSize[0] / 2 + 180)):
-                    print("process")
-                    percent = (event.x - (self.videoSize[0] / 2 - 180)) / 360
-                    self.jumpTo(int(self.totalFrame * percent))
-                    self.drawUI()
+            if event.y in range(self.videoSize[1]-10, self.videoSize[1] + 5):
+                print("process")
+                percent =event.x / self.videoSize[0]
+                self.jumpTo(int(self.totalFrame * percent))
+                self.drawUI()
 
         print("clicked at", event.x, event.y)
 
@@ -255,47 +286,85 @@ class VideoPlayer(tk.Frame):
 
     def drawUI(self):
         self.display.delete("BAR")
-        self.display.create_image(self.videoSize[0] / 2, self.videoSize[1], image=self.barUI, anchor=tk.S, tags="BAR")
+        # self.display.create_image(
+        #     self.videoSize[0] / 2,
+        #     self.videoSize[1],
+        #     image=self.barUI,
+        #     anchor=tk.S,
+        #     tags="BAR",
+        # )
         if self.isPlaying:
             self.display.create_image(
-                self.videoSize[0] / 2, self.videoSize[1] - 50, image=self.pauseUI, anchor=tk.S, tags="BAR"
+                self.videoSize[0] / 2,
+                self.videoSize[1] + 40,
+                image=self.pauseUI,
+                anchor=tk.S,
+                tags="BAR",
             )
         else:
             self.display.create_image(
-                self.videoSize[0] / 2, self.videoSize[1] - 50, image=self.playUI, anchor=tk.S, tags="BAR"
+                self.videoSize[0] / 2,
+                self.videoSize[1] + 40,
+                image=self.playUI,
+                anchor=tk.S,
+                tags="BAR",
             )
         self.display.create_image(
-            self.videoSize[0] / 2 - 150, self.videoSize[1] - 50, image=self.cameraUI, anchor=tk.S, tags="BAR"
+            self.videoSize[0] / 2 - 150,
+            self.videoSize[1] + 40,
+            image=self.cameraUI,
+            anchor=tk.S,
+            tags="BAR",
         )
         self.display.create_image(
-            self.videoSize[0] / 2 - 100, self.videoSize[1] - 50, image=self.importUI, anchor=tk.S, tags="BAR"
+            self.videoSize[0] / 2 - 100,
+            self.videoSize[1] + 40,
+            image=self.importUI,
+            anchor=tk.S,
+            tags="BAR",
         )
         self.display.create_image(
-            self.videoSize[0] / 2 - 50, self.videoSize[1] - 50, image=self.backwardUI, anchor=tk.S, tags="BAR"
+            self.videoSize[0] / 2 - 50,
+            self.videoSize[1] + 40,
+            image=self.backwardUI,
+            anchor=tk.S,
+            tags="BAR",
         )
         self.display.create_image(
-            self.videoSize[0] / 2 + 50, self.videoSize[1] - 50, image=self.forwardUI, anchor=tk.S, tags="BAR"
+            self.videoSize[0] / 2 + 50,
+            self.videoSize[1] + 40,
+            image=self.forwardUI,
+            anchor=tk.S,
+            tags="BAR",
         )
         self.display.create_image(
-            self.videoSize[0] / 2 + 100, self.videoSize[1] - 50, image=self.gobackUI, anchor=tk.S, tags="BAR"
+            self.videoSize[0] / 2 + 100,
+            self.videoSize[1] + 40,
+            image=self.gobackUI,
+            anchor=tk.S,
+            tags="BAR",
         )
         self.display.create_image(
-            self.videoSize[0] / 2 + 150, self.videoSize[1] - 50, image=self.exportUI, anchor=tk.S, tags="BAR"
+            self.videoSize[0] / 2 + 150,
+            self.videoSize[1] + 40,
+            image=self.exportUI,
+            anchor=tk.S,
+            tags="BAR",
         )
         if self.isVideo:
             self.display.create_text(
-                self.videoSize[0] / 2 + 130,
-                self.videoSize[1] - 30,
+                self.videoSize[0] / 2 + 240,
+                self.videoSize[1] + 40,
                 text=self.nowTimeString + self.totalTimeString,
                 font=("Arial", 10),
                 fill="white",
                 anchor=tk.S,
                 tags="BAR",
             )
-            processX = (self.frameCount / self.totalFrame) * 350
+            processX = (self.frameCount / self.totalFrame) * self.videoSize[0]
             self.display.create_image(
-                self.videoSize[0] / 2 - 175 + processX,
-                self.videoSize[1] - 13,
+                processX,
+                self.videoSize[1]+7,
                 image=self.circleUI,
                 anchor=tk.S,
                 tags="BAR",
