@@ -1,12 +1,15 @@
 from PIL import Image, ImageTk
 import tkinter as tk
-from tkinter import ttk
-import tkinter.filedialog
-import tkinter.messagebox
+from tkinter import filedialog
+from tkinter import messagebox
 from datetime import datetime
+import time
 import cv2
 import os
 import numpy
+from pydub import AudioSegment
+import simpleaudio
+
 
 script_dir = os.path.dirname(__file__)
 
@@ -18,7 +21,10 @@ class VideoPlayer(tk.Frame):
         self.rowconfigure(0, weight=1)
         #
         self.cap = None
+        self.audio = None
+        self.audioObject = None
         self.currentImage = None
+        self.skipNext = Falses
         # Status
         self.cameraNum = cameraNum
         self.videoSize = videoSize
@@ -73,17 +79,24 @@ class VideoPlayer(tk.Frame):
         print("=========================\n")
 
     def handleOpen(self):
-        path = tk.filedialog.askopenfilename()
+        path = filedialog.askopenfilename()
         if path:
             if path.split(".")[-1].lower() in ["mkv", "mp4", "avi", "mov", "mpeg", "flv", "wmv"]:
                 self.openFile(path)
             else:
-                tk.messagebox.showinfo("無法開啟檔案", "此檔案不是支援的影片檔")
+                messagebox.showinfo("無法開啟檔案", "此檔案不是支援的影片檔")
 
     def openFile(self, path: str):
         self.cap = cv2.VideoCapture(path)
         self.frameCount = 0
         self.getDetails()
+        self.audio = AudioSegment.from_file(path, format=path.split(".")[-1])
+        self.audioObject = simpleaudio.play_buffer(
+            self.audio.raw_data,
+            num_channels=self.audio.channels,
+            bytes_per_sample=self.audio.sample_width,
+            sample_rate=self.audio.frame_rate,
+        )
         self.isVideo = True
         self.isPlaying = True
         print("\n==========Video==========")
@@ -113,6 +126,19 @@ class VideoPlayer(tk.Frame):
         if self.rate >= 4 and val == +0.2:
             return
         self.rate += val
+        if self.audioObject:
+            self.audioObject.stop()
+            frame_rate = self.audio.frame_rate
+            self.audio = self.audio._spawn(
+                self.audio.raw_data, overrides={"frame_rate": int(self.audio.frame_rate * self.rate)}
+            )
+            self.audioObject = simpleaudio.play_buffer(
+                self.audio[int(self.frameCount / self.fps) * 1000 :].raw_data,
+                num_channels=self.audio.channels,
+                bytes_per_sample=self.audio.sample_width,
+                sample_rate=frame_rate,
+            )
+
         print("\n=======Rate Change=======")
         print(f"Current Rate: {self.rate} (0.2~4.0)")
         print(f"Frame Interval: {int(self.frameInterval * self.rate)}ms")
@@ -128,20 +154,29 @@ class VideoPlayer(tk.Frame):
         s -= m * 60
         self.nowTimeString = "{:02d}:{:02d}".format(m, s)
         self.drawUI()
+        if self.audioObject and self.audioObject.is_playing():
+            self.audioObject.stop()
+            self.audioObject = simpleaudio.play_buffer(
+                self.audio[(s + m * 60) * 1000 :].raw_data,
+                num_channels=self.audio.channels,
+                bytes_per_sample=self.audio.sample_width,
+                sample_rate=self.audio.frame_rate,
+            )
+
         print("\n========Jump To========")
         print("Time:", "{:02d}:{:02d}".format(m, s))
         print("=========================\n")
 
     def frameLoop(self):
+        delayS = time.time()
         if self.frameCount == self.totalFrame:
             self.isPlaying = False
-            self.drawUI()
         if self.isPlaying:
             self.cap.grab()
             self.frameCount += 1
-            # skip 1 frame for better performance
-            # if self.frameCount % 2 == 0:
-            if True:
+            if self.skipNext:
+                self.skipNext = False
+            else:
                 s = int(self.frameCount / self.fps)
                 m = int(s / 60)
                 s -= m * 60
@@ -154,8 +189,18 @@ class VideoPlayer(tk.Frame):
                     self.imgtk = ImageTk.PhotoImage(image)
                     self.display.delete("VID")
                     self.display.create_image(0, 0, image=self.imgtk, anchor=tk.NW, tags="VID")
-                    self.drawUI()
-        self.after(int(self.frameInterval * self.rate), self.frameLoop)
+
+        self.drawUI()
+        delayE = time.time()
+        delay = self.frameInterval * self.rate - int(1000 * (delayE - delayS))
+        if not self.isPlaying:
+            delay = 100
+
+        if delay < 1:
+            delay = 1
+            self.skipNext = True
+
+        self.after(delay, self.frameLoop)
 
     def screenShot(self):
         if not self.cap or not isinstance(self.currentImage, numpy.ndarray):
@@ -164,7 +209,7 @@ class VideoPlayer(tk.Frame):
         self.drawUI()
         cv2image = cv2.cvtColor(self.currentImage, cv2.COLOR_BGR2RGBA)
         image = Image.fromarray(cv2image)
-        path = tk.filedialog.asksaveasfilename(
+        path = filedialog.asksaveasfilename(
             initialdir=script_dir, filetypes=[("PNG", ".png"), ("JPEG", ".jpg")], defaultextension=".png"
         )
         if not path:
@@ -182,7 +227,23 @@ class VideoPlayer(tk.Frame):
         if event.y in range(self.videoSize[1] - 80, self.videoSize[1] - 50):
             if event.x in range(int(self.videoSize[0] / 2 - 12), int(self.videoSize[0] / 2 + 12)):
                 print("Play")
-                self.isPlaying = not self.isPlaying
+                if self.isPlaying:
+                    self.isPlaying = False
+                    if self.isVideo:
+                        self.audioObject.stop()
+                else:
+                    self.isPlaying = True
+                    if self.isVideo:
+                        s = self.frameCount / self.fps
+                        m = int(s / 60)
+                        s -= m * 60
+                        self.audioObject = simpleaudio.play_buffer(
+                            self.audio[(s + m * 60) * 1000 :].raw_data,
+                            num_channels=self.audio.channels,
+                            bytes_per_sample=self.audio.sample_width,
+                            sample_rate=self.audio.frame_rate,
+                        )
+
                 self.drawUI()
             elif event.x in range(int(self.videoSize[0] / 2 - 62), int(self.videoSize[0] / 2 - 38)):
                 print("backfard")
